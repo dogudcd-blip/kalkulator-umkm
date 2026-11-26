@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kalkulator Harga Jual Online</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#14181f;--mut:#5b6573;--bd:#d9dee5;--ac:#0a7d4f;--acbg:#e3f5ec;--warn:#8a5a00;--warnbg:#fff4d6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101317;--card:#1a1f26;--tx:#eef1f5;--mut:#9aa6b4;--bd:#2c343e;--ac:#4cd698;--acbg:#13382a;--warn:#f2c86b;--warnbg:#3a2f12}}
+:root[data-theme="dark"]{--bg:#101317;--card:#1a1f26;--tx:#eef1f5;--mut:#9aa6b4;--bd:#2c343e;--ac:#4cd698;--acbg:#13382a;--warn:#f2c86b;--warnbg:#3a2f12}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px}
+main{max-width:480px;margin:0 auto}
+h1{font-size:1.25rem;margin:4px 0 4px}p.s{color:var(--mut);margin:0 0 14px;font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:.85rem;color:var(--mut);margin:10px 0 4px}label:first-child{margin-top:0}
+input,select{width:100%;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:11px 12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.res{background:var(--acbg);border-color:var(--ac)}
+.big{font-size:1.9rem;font-weight:700;color:var(--ac);margin:2px 0 8px}
+.k{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--bd);font-size:.95rem}
+.k span:first-child{color:var(--mut)}
+.note{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:.82rem}
+.err{color:#c0392b;font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+<h1>Kalkulator Harga Jual Online</h1>
+<p class="s">Isi biaya, lalu lihat harga yang aman dipasang supaya untungmu tidak kurang.</p>
+<div class="card">
+<label for="modal">Modal barang (Rp)</label><input id="modal" inputmode="numeric" value="40000">
+<div class="row"><div><label for="kemas">Biaya kemas (Rp)</label><input id="kemas" inputmode="numeric" value="2000"></div>
+<div><label for="ongkir">Ongkir ditanggung (Rp)</label><input id="ongkir" inputmode="numeric" value="0"></div></div>
+<div class="row"><div><label for="fee">Total fee marketplace (%)</label><input id="fee" inputmode="decimal" value="8"></div>
+<div><label for="tetap">Biaya tetap/pesanan (Rp)</label><input id="tetap" inputmode="numeric" value="0"></div></div>
+<div class="row"><div><label for="diskon">Diskon untuk pembeli (%)</label><input id="diskon" inputmode="decimal" value="10"></div>
+<div><label for="target">Target untung (Rp)</label><input id="target" inputmode="numeric" value="8000"></div></div>
+<label for="bulat">Pembulatan harga ke atas</label>
+<select id="bulat"><option value="1">Tidak dibulatkan</option><option value="100">Kelipatan Rp100</option><option value="500">Kelipatan Rp500</option><option value="1000">Kelipatan Rp1.000</option></select>
+</div>
+<div class="card res" id="out"></div>
+<div class="note">Angka awal di atas hanya contoh. Isi fee sesuai rincian biaya di seller center marketplace-mu, karena persentasenya bisa berubah. Fee dihitung dari harga setelah diskon.</div>
+</main>
+<script>
+function ceilDiv(a, b) { return Math.floor((a + b - 1) / b); }
+function hitung(i) {
+  if (i.feeBp >= 10000 || i.diskonBp >= 10000 || i.feeBp < 0 || i.diskonBp < 0) throw new Error("Fee/diskon harus di bawah 100%");
+  const bulat = i.bulat || 1;
+  const biaya = i.modal + i.kemas + i.ongkir;
+  const akhir = h => h - Math.floor(h * i.diskonBp / 10000);
+  const fee = p => ceilDiv(p * i.feeBp, 10000) + i.tetap;
+  const untung = h => { const p = akhir(h); return p - fee(p) - biaya; };
+  const p0 = ceilDiv((biaya + i.tetap + i.target) * 10000, 10000 - i.feeBp);
+  let h = ceilDiv(ceilDiv(p0 * 10000, 10000 - i.diskonBp), bulat) * bulat;
+  while (untung(h) < i.target) h += bulat;
+  while (h - bulat > 0 && untung(h - bulat) >= i.target) h -= bulat;
+  const p = akhir(h);
+  return { harga: h, hargaAkhir: p, fee: fee(p), untung: untung(h), marginBp: p > 0 ? Math.floor(untung(h) * 10000 / p) : 0 };
+}
+
+
+const $ = id => document.getElementById(id);
+const rp = n => "Rp" + n.toLocaleString("id-ID");
+const uang = id => parseInt(($(id).value || "").replace(/\D/g, ""), 10) || 0;
+const pct = id => Math.round((parseFloat(($(id).value || "").replace(",", ".")) || 0) * 100);
+function render() {
+  const out = $("out");
+  try {
+    const r = hitung({ modal: uang("modal"), kemas: uang("kemas"), ongkir: uang("ongkir"), tetap: uang("tetap"),
+      feeBp: pct("fee"), diskonBp: pct("diskon"), target: uang("target"), bulat: parseInt($("bulat").value, 10) });
+    out.innerHTML = '<div style="font-size:.85rem;color:var(--mut)">Pasang harga di marketplace</div><div class="big">' + rp(r.harga) + '</div>' +
+      '<div class="k"><span>Harga setelah diskon</span><span>' + rp(r.hargaAkhir) + '</span></div>' +
+      '<div class="k"><span>Fee dipotong marketplace</span><span>' + rp(r.fee) + '</span></div>' +
+      '<div class="k"><span>Untung bersih</span><span><b>' + rp(r.untung) + '</b></span></div>' +
+      '<div class="k"><span>Margin dari harga jual</span><span>' + (r.marginBp / 100).toFixed(1).replace(".", ",") + '%</span></div>';
+  } catch (e) { out.innerHTML = '<div class="err">' + e.message + '</div>'; }
+}
+document.querySelectorAll("input,select").forEach(el => el.addEventListener("input", render));
+render();
+</script>
+</body>
+</html>
