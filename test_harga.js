@@ -1,0 +1,11 @@
+const assert = require("assert");
+const { hitung } = require("./harga.js");
+const dasar = { modal: 40000, kemas: 2000, ongkir: 0, tetap: 0, feeBp: 800, diskonBp: 1000, target: 8000, bulat: 1 };
+const t = (n, f) => { f(); console.log("lulus", n); };
+t("R01 semua hasil integer rupiah", () => { const r = hitung({ ...dasar, feeBp: 833, diskonBp: 1234 }); Object.values(r).forEach(v => assert(Number.isInteger(v))); });
+t("R02 contoh hitung manual", () => { const r = hitung(dasar); assert.deepStrictEqual([r.harga, r.hargaAkhir, r.fee, r.untung], [60386, 54348, 4348, 8000]); });
+t("R03 untung tidak pernah di bawah target", () => { for (const fee of [0, 500, 1250, 2000]) for (const d of [0, 500, 3000]) for (const tg of [0, 1000, 8000]) assert(hitung({ ...dasar, feeBp: fee, diskonBp: d, target: tg }).untung >= tg); });
+t("R04 diskon lebih besar, harga tampil lebih tinggi", () => assert(hitung({ ...dasar, diskonBp: 2000 }).harga > hitung(dasar).harga));
+t("R05 pembulatan ke atas kelipatan", () => { const r = hitung({ ...dasar, bulat: 500 }); assert(r.harga % 500 === 0 && r.harga >= 60386 && r.untung >= 8000); });
+t("R06 fee atau diskon 100% ditolak", () => { assert.throws(() => hitung({ ...dasar, feeBp: 10000 })); assert.throws(() => hitung({ ...dasar, diskonBp: 10000 })); });
+t("R07 biaya tetap per pesanan ikut dihitung", () => assert(hitung({ ...dasar, tetap: 1250 }).harga > hitung(dasar).harga));
